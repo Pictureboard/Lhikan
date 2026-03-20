@@ -1,0 +1,18 @@
+# Dipendenze Composer
+vendor/
+
+# File con credenziali sensibili
+backend/config/mail.php
+
+# File di sistema Mac
+.DS_Store
+
+# File di sistema Windows
+Thumbs.db
+desktop.ini
+
+# Dipendenze Node.js
+node_modules/
+
+# File di ambiente
+.env
