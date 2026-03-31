@@ -22,7 +22,7 @@ function sendTwoFactorCode($toEmail, $toName, $code) {
         $mail->Username   = MAIL_USERNAME;
         $mail->Password   = MAIL_PASSWORD;
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = 587;
+        $mail->Port       = 587; // Porta standard per Gmail
 
         // Mittente e destinatario
         $mail->setFrom(MAIL_FROM, MAIL_FROMNAME);

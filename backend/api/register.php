@@ -6,6 +6,8 @@ header('Content-Type: application/json');
 
 // Connessione al database
 require_once '../config/db.php';
+// Carichiamo il mailer per inviare il codice 2FA
+require_once '../utils/mailer.php';
 
 // Leggiamo il body della richiesta HTTP (ci aspettiamo un JSON dal client)
 $data = json_decode(file_get_contents('php://input'), true);
@@ -68,7 +70,19 @@ try {
     $stmt = $pdo->prepare('INSERT INTO UserStatistics (userId) VALUES (?)');
     $stmt->execute([$userId]);
 
-    // TODO: inviare email con $twoFactorCode tramite mailer.php
+    // Inviare email con $twoFactorCode tramite mailer.php
+    sendTwoFactorEmail($email, $userName, $twoFactorCode);
+
+    if(!$mailSent) {
+        // L'email non è partita, eliminiamo l'utente appena creato
+        // così può riprovare la registrazione da capo
+        $stmt = $pdo->prepare('DELETE FROM User WHERE userId = ?');
+        $stmt->execute([$userId]);
+
+        http_response_code(500);
+        echo json_encode(['error' => 'Invio email fallito, riprova la registrazione']);
+        exit;
+    }
 
     http_response_code(201);
     echo json_encode(['message' => 'Registrazione avvenuta, controlla la tua email per il codice 2FA']);
