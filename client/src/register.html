@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Lhikan - Register</title>
+</head>
+<body>
+    <h1>Registrazione</h1>
+
+    <input type="text"     id="userName" placeholder="Username">
+    <input type="email"    id="email"    placeholder="Email">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="register()">Registrati</button>
+
+    <p id="message"></p>
+
+    <script>
+        async function register() {
+            const userName = document.getElementById('userName').value;
+            const email    = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            const response = await fetch('http://localhost/Lhikan/backend/api/register.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userName, email, password })
+            });
+
+            const data = await response.json();
+            document.getElementById('message').innerText = data.message || data.error;
+
+            // Se la registrazione è andata a buon fine, salviamo l'email
+            // e andiamo sulla pagina di verifica
+            if (response.ok) {
+                localStorage.setItem('pendingEmail', email);
+                window.location.href = 'verify2fa.html';
+            }
+        }
+    </script>
+</body>
+</html>

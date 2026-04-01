@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Lhikan - Verifica</title>
+</head>
+<body>
+    <h1>Verifica codice 2FA</h1>
+
+    <input type="text" id="code" placeholder="Inserisci il codice ricevuto via email">
+    <button onclick="verify()">Verifica</button>
+
+    <p id="message"></p>
+
+    <script>
+        async function verify() {
+            // Recuperiamo l'email salvata dalla pagina precedente
+            const email = localStorage.getItem('pendingEmail');
+            const code  = document.getElementById('code').value;
+
+            if (!email) {
+                document.getElementById('message').innerText = 'Errore: email non trovata, torna alla registrazione';
+                return;
+            }
+
+            const response = await fetch('http://localhost/Lhikan/backend/api/verify2fa.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, code })
+            });
+
+            const data = await response.json();
+            document.getElementById('message').innerText = data.message || data.error;
+
+            if (response.ok) {
+                // Puliamo l'email dal localStorage
+                localStorage.removeItem('pendingEmail');
+                // TODO: redirect alla home dopo il login
+                document.getElementById('message').innerText = 'Accesso completato!';
+            }
+        }
+    </script>
+</body>
+</html>

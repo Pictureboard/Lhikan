@@ -40,7 +40,7 @@ try {
     $stmt->execute([$twoFactorCode, $twoFactorExpire, $user['userId']]);
 
     // Inviamo il codice 2FA via email
-    $mailSent = sendTwoFactorCode($email, $user['userName'], $twoFactorCode);
+    $mailSent = sendTwoFactorCode($email, $userName, $twoFactorCode);
 
     if (!$mailSent) {
         http_response_code(500);
