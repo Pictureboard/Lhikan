@@ -4,6 +4,7 @@ header('Content-Type: application/json');
 
 require_once '../config/db.php';
 
+// Recuperiamo i dati inviati dal client
 $data = json_decode(file_get_contents('php://input'), true);
 
 // Controlliamo che i campi obbligatori siano presenti
