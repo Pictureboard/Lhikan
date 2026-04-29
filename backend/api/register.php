@@ -1,18 +1,12 @@
 <?php
-// Permette richieste da qualsiasi origine (necessario per fetch API dal client)
 header('Access-Control-Allow-Origin: *');
-// Indichiamo che la risposta sarà in formato JSON
 header('Content-Type: application/json');
 
-// Connessione al database
 require_once '../config/db.php';
-// Carichiamo il mailer per inviare il codice 2FA
 require_once '../utils/mailer.php';
 
-// Leggiamo il body della richiesta HTTP (ci aspettiamo un JSON dal client)
 $data = json_decode(file_get_contents('php://input'), true);
 
-// Controlliamo che i campi obbligatori siano presenti
 if (empty($data['email']) || empty($data['password']) || empty($data['userName'])) {
     http_response_code(400);
     echo json_encode(['error' => 'Campi obbligatori mancanti']);
@@ -23,14 +17,12 @@ $email    = trim($data['email']);
 $password = $data['password'];
 $userName = trim($data['userName']);
 
-// Validiamo il formato dell'email
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     http_response_code(400);
     echo json_encode(['error' => 'Email non valida']);
     exit;
 }
 
-// Validiamo la lunghezza minima della password
 if (strlen($password) < 8) {
     http_response_code(400);
     echo json_encode(['error' => 'La password deve essere di almeno 8 caratteri']);
@@ -38,57 +30,76 @@ if (strlen($password) < 8) {
 }
 
 try {
-    // Controlliamo se email o username sono già in uso
-    $stmt = $pdo->prepare('SELECT userId FROM User WHERE email = ? OR userName = ?');
+    // Cerchiamo se esiste già un utente con quella email o username
+    $stmt = $pdo->prepare('SELECT userId, isVerified, twoFactorExpire FROM User WHERE email = ? OR userName = ?');
     $stmt->execute([$email, $userName]);
+    $existingUser = $stmt->fetch();
 
-    if ($stmt->fetch()) {
-        http_response_code(409);
-        echo json_encode(['error' => 'Email o username già in uso']);
-        exit;
+    if ($existingUser) {
+        // Se l'utente esiste ed è verificato, blocchiamo
+        if ($existingUser['isVerified']) {
+            http_response_code(409);
+            echo json_encode(['error' => 'Email o username già in uso']);
+            exit;
+        }
+
+        // Se l'utente esiste ma NON è verificato, controlliamo se il codice è scaduto
+        if (new DateTime() < new DateTime($existingUser['twoFactorExpire'])) {
+            // Il codice non è ancora scaduto, l'utente deve ancora verificarsi
+            http_response_code(409);
+            echo json_encode(['error' => 'Account già registrato, controlla la tua email per il codice di verifica']);
+            exit;
+        }
+
+        // Utente non verificato e codice scaduto → sovrascriviamo
+        $hashedPassword  = password_hash($password, PASSWORD_BCRYPT);
+        $twoFactorCode   = strval(random_int(100000, 999999));
+        $twoFactorExpire = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+
+        $stmt = $pdo->prepare('
+            UPDATE User 
+            SET email = ?, password = ?, userName = ?, 
+                twoFactorCode = ?, twoFactorExpire = ?, isVerified = FALSE
+            WHERE userId = ?
+        ');
+        $stmt->execute([$email, $hashedPassword, $userName, $twoFactorCode, $twoFactorExpire, $existingUser['userId']]);
+        $userId = $existingUser['userId'];
+
+    } else {
+        // Utente nuovo → lo inseriamo
+        $hashedPassword  = password_hash($password, PASSWORD_BCRYPT);
+        $twoFactorCode   = strval(random_int(100000, 999999));
+        $twoFactorExpire = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+
+        $stmt = $pdo->prepare('
+            INSERT INTO User (email, password, userName, twoFactorCode, twoFactorExpire)
+            VALUES (?, ?, ?, ?, ?)
+        ');
+        $stmt->execute([$email, $hashedPassword, $userName, $twoFactorCode, $twoFactorExpire]);
+        $userId = $pdo->lastInsertId();
+
+        // Creiamo il record statistiche solo per utenti nuovi
+        $stmt = $pdo->prepare('INSERT INTO UserStatistics (userId) VALUES (?)');
+        $stmt->execute([$userId]);
     }
 
-    // Hash della password (mai salvare password in chiaro nel DB!)
-    $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
-
-    // Generiamo il codice 2FA (6 cifre)
-    $twoFactorCode   = strval(random_int(100000, 999999));
-    // Il codice scade dopo 15 minuti
-    $twoFactorExpire = date('Y-m-d H:i:s', strtotime('+15 minutes'));
-
-    // Inseriamo il nuovo utente nel database (placeholder ? per i dati con execute)
-    $stmt = $pdo->prepare('
-        INSERT INTO User (email, password, userName, twoFactorCode, twoFactorExpire)
-        VALUES (?, ?, ?, ?, ?)
-    ');
-    $stmt->execute([$email, $hashedPassword, $userName, $twoFactorCode, $twoFactorExpire]);
-
-    // Recuperiamo l'id dell'utente appena creato
-    $userId = $pdo->lastInsertId();
-
-    // Creiamo il record delle statistiche per il nuovo utente
-    $stmt = $pdo->prepare('INSERT INTO UserStatistics (userId) VALUES (?)');
-    $stmt->execute([$userId]);
-
-    // Inviare email con $twoFactorCode tramite mailer.php
+    // Inviamo il codice 2FA via email
     $mailSent = sendTwoFactorCode($email, $userName, $twoFactorCode);
-    
-    /*if(!$mailSent) {
-        // L'email non è partita, eliminiamo l'utente appena creato
-        // così può riprovare la registrazione da capo
-        $stmt = $pdo->prepare('DELETE FROM User WHERE userId = ?');
-        $stmt->execute([$userId]);
+
+    if ($mailSent !== true) {
+        // Email fallita → eliminiamo o ripristiniamo l'utente
+        if (!$existingUser) {
+            // Era un utente nuovo, lo eliminiamo
+            $stmt = $pdo->prepare('DELETE FROM User WHERE userId = ?');
+            $stmt->execute([$userId]);
+        } else {
+            // Era una sovrascrittura, rimettiamo isVerified = FALSE e azzeriamo il codice
+            $stmt = $pdo->prepare('UPDATE User SET twoFactorCode = NULL, twoFactorExpire = NULL WHERE userId = ?');
+            $stmt->execute([$userId]);
+        }
 
         http_response_code(500);
-        echo json_encode(['error' => 'Invio email fallito, riprova la registrazione']);
-        exit;
-    }*/
-
-    if (!$mailSent) {
-        $stmt = $pdo->prepare('DELETE FROM User WHERE userId = ?');
-        $stmt->execute([$userId]);
-        http_response_code(500);
-        echo json_encode(['error' => $mailSent]); // mostra l'errore reale
+        echo json_encode(['error' => 'Invio email fallito: ' . $mailSent]);
         exit;
     }
 

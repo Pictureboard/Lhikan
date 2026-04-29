@@ -9,34 +9,48 @@
 
     <input type="email"    id="email"    placeholder="Email">
     <input type="password" id="password" placeholder="Password">
-    <button onclick="login()">Accedi</button>
+    <button id="submitBtn" onclick="login()">Accedi</button>
 
     <p id="message"></p>
 
     <script>
         async function login() {
-            const email    = document.getElementById('email').value;
+            const email    = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
+            const btn      = document.getElementById('submitBtn');
+            const msg      = document.getElementById('message');
 
-            // Validazione base lato client
             if (!email || !password) {
-                document.getElementById('message').innerText = 'Compila tutti i campi';
+                msg.innerText = 'Compila tutti i campi';
                 return;
             }
 
-            const response = await fetch('http://localhost/Lhikan/backend/api/login.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
+            btn.disabled  = true;
+            btn.innerText = 'Attendere...';
+            msg.innerText = '';
 
-            const data = await response.json();
-            document.getElementById('message').innerText = data.message || data.error;
+            try {
+                const response = await fetch('http://localhost/Lhikan/backend/api/login.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
 
-            if (response.ok) {
-                // Salviamo l'email per verify2fa.html
-                localStorage.setItem('pendingEmail', email);
-                window.location.href = 'verify2fa.html';
+                const data = await response.json();
+                msg.innerText = data.message || data.error;
+
+                if (response.ok) {
+                    localStorage.setItem('pendingEmail', email);
+                    window.location.href = 'verify2fa.html';
+                } else {
+                    btn.disabled  = false;
+                    btn.innerText = 'Accedi';
+                }
+
+            } catch (err) {
+                msg.innerText = 'Errore di connessione, riprova';
+                btn.disabled  = false;
+                btn.innerText = 'Accedi';
             }
         }
     </script>

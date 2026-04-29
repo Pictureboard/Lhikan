@@ -7,36 +7,53 @@
 <body>
     <h1>Verifica codice 2FA</h1>
 
-    <input type="text" id="code" placeholder="Inserisci il codice ricevuto via email">
-    <button onclick="verify()">Verifica</button>
-
+    <input type="text" id="code" placeholder="Inserisci il codice ricevuto via email" maxlength="6">
+    <button id="submitBtn" onclick="verify()">Verifica</button>
     <p id="message"></p>
 
     <script>
-        async function verify() {
-            // Recuperiamo l'email salvata dalla pagina precedente
-            const email = localStorage.getItem('pendingEmail');
-            const code  = document.getElementById('code').value;
+        // Se non c'è email in localStorage mandiamo subito indietro
+        if (!localStorage.getItem('pendingEmail')) {
+            window.location.href = 'login.html';
+        }
 
-            if (!email) {
-                document.getElementById('message').innerText = 'Errore: email non trovata, torna alla registrazione';
+        async function verify() {
+            const email = localStorage.getItem('pendingEmail');
+            const code  = document.getElementById('code').value.trim();
+            const btn   = document.getElementById('submitBtn');
+            const msg   = document.getElementById('message');
+
+            if (!code || code.length !== 6) {
+                msg.innerText = 'Inserisci un codice di 6 cifre';
                 return;
             }
 
-            const response = await fetch('http://localhost/Lhikan/backend/api/verify2fa.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, code })
-            });
+            btn.disabled  = true;
+            btn.innerText = 'Attendere...';
+            msg.innerText = '';
 
-            const data = await response.json();
-            document.getElementById('message').innerText = data.message || data.error;
+            try {
+                const response = await fetch('http://localhost/Lhikan/backend/api/verify2fa.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, code })
+                });
 
-            if (response.ok) {
-                // Puliamo l'email dal localStorage
-                localStorage.removeItem('pendingEmail');
-                // TODO: redirect alla home dopo il login
-                document.getElementById('message').innerText = 'Accesso completato!';
+                const data = await response.json();
+                msg.innerText = data.message || data.error;
+
+                if (response.ok) {
+                    localStorage.removeItem('pendingEmail');
+                    // TODO: redirect alla home
+                } else {
+                    btn.disabled  = false;
+                    btn.innerText = 'Verifica';
+                }
+
+            } catch (err) {
+                msg.innerText = 'Errore di connessione, riprova';
+                btn.disabled  = false;
+                btn.innerText = 'Verifica';
             }
         }
     </script>
