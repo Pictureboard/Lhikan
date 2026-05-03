@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Lhikan - Home</title>
+</head>
+<body>
+    <h1>Benvenuto su Lhikan!</h1>
+    <p id="welcome"></p>
+    <button onclick="logout()">Logout</button>
+
+    <script>
+        // Controlliamo subito se il token esiste
+        const token = localStorage.getItem('token');
+        const user  = JSON.parse(localStorage.getItem('user'));
+
+        if (!token || !user) {
+            // Non loggato, rimanda al login
+            window.location.href = 'login.html';
+        }
+
+        // Mostriamo i dati dell'utente
+        document.getElementById('welcome').innerText = 'Ciao, ' + user.userName + '!';
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>

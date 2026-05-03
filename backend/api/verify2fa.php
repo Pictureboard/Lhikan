@@ -3,11 +3,15 @@ header('Access-Control-Allow-Origin: *');
 header('Content-Type: application/json');
 
 require_once '../config/db.php';
+require_once '../config/jwt.php';
 
-// Recuperiamo i dati inviati dal client
+// Importiamo la libreria JWT
+use Firebase\JWT\JWT;
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
 $data = json_decode(file_get_contents('php://input'), true);
 
-// Controlliamo che i campi obbligatori siano presenti
 if (empty($data['email']) || empty($data['code'])) {
     http_response_code(400);
     echo json_encode(['error' => 'Campi obbligatori mancanti']);
@@ -18,26 +22,22 @@ $email = trim($data['email']);
 $code  = trim($data['code']);
 
 try {
-    // Cerchiamo l'utente tramite email
     $stmt = $pdo->prepare('SELECT * FROM User WHERE email = ?');
     $stmt->execute([$email]);
     $user = $stmt->fetch();
 
-    // Se l'utente non esiste
     if (!$user) {
         http_response_code(404);
         echo json_encode(['error' => 'Utente non trovato']);
         exit;
     }
 
-    // Controlliamo che il codice non sia scaduto
     if (new DateTime() > new DateTime($user['twoFactorExpire'])) {
         http_response_code(401);
         echo json_encode(['error' => 'Codice scaduto, effettua di nuovo il login']);
         exit;
     }
 
-    // Controlliamo che il codice sia corretto
     if ($code !== $user['twoFactorCode']) {
         http_response_code(401);
         echo json_encode(['error' => 'Codice non valido']);
@@ -52,16 +52,21 @@ try {
     ');
     $stmt->execute([$user['userId']]);
 
-    // Generiamo un token di sessione semplice
-    $sessionToken = bin2hex(random_bytes(32));
+    // Generiamo il token JWT
+    $payload = [
+        'userId'   => $user['userId'],
+        'userName' => $user['userName'],
+        'email'    => $user['email'],
+        'iat'      => time(),                // issued at - quando è stato generato
+        'exp'      => time() + (60 * 60 * 24) // scade dopo 24 ore
+    ];
 
-    // TODO: salvare il token di sessione nel DB o in sessione PHP
-    // Lo gestiamo al prossimo step
+    $token = JWT::encode($payload, JWT_SECRET, 'HS256');
 
     http_response_code(200);
     echo json_encode([
         'message' => 'Verifica completata, accesso effettuato',
-        'token'   => $sessionToken,
+        'token'   => $token,
         'user'    => [
             'userId'   => $user['userId'],
             'userName' => $user['userName'],

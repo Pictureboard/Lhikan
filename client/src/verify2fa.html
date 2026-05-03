@@ -44,7 +44,11 @@
 
                 if (response.ok) {
                     localStorage.removeItem('pendingEmail');
-                    // TODO: redirect alla home
+                    // Salviamo il token JWT e i dati utente
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    // Redirect alla home
+                    window.location.href = 'home.html';
                 } else {
                     btn.disabled  = false;
                     btn.innerText = 'Verifica';

@@ -4,6 +4,7 @@ vendor/
 # File con credenziali sensibili
 backend/config/mail.php
 backend/config/db.php
+backend/config/jwt.php
 
 # File di sistema Mac
 .DS_Store
