@@ -7,20 +7,44 @@
 <body>
     <h1>Benvenuto su Lhikan!</h1>
     <p id="welcome"></p>
+    <p id="stats"></p>
     <button onclick="logout()">Logout</button>
 
     <script>
-        // Controlliamo subito se il token esiste
         const token = localStorage.getItem('token');
         const user  = JSON.parse(localStorage.getItem('user'));
 
         if (!token || !user) {
-            // Non loggato, rimanda al login
             window.location.href = 'login.html';
         }
 
-        // Mostriamo i dati dell'utente
-        document.getElementById('welcome').innerText = 'Ciao, ' + user.userName + '!';
+        // Chiamiamo profile.php con il token
+        async function loadProfile() {
+            const response = await fetch('http://localhost/Lhikan/backend/api/profile.php', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                }
+            });
+
+            if (response.status === 401) {
+                // Token scaduto o non valido
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const data = await response.json();
+            document.getElementById('welcome').innerText = 'Ciao, ' + data.profile.userName + '!';
+            document.getElementById('stats').innerText = 
+                'Partite giocate: ' + data.profile.gamesPlayed + 
+                ' | Vinte: ' + data.profile.gamesWon + 
+                ' | Perse: ' + data.profile.gamesLost;
+        }
+
+        loadProfile();
 
         function logout() {
             localStorage.removeItem('token');
