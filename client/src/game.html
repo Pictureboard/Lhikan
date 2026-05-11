@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Lhikan - Game</title>
+</head>
+<body>
+
+    <!-- SCHERMATA LOBBY -->
+    <div id="lobbyScreen">
+        <h1>Lhikan</h1>
+        <p id="status"></p>
+
+        <input type="text" id="roomIdInput" placeholder="Nome stanza">
+        <button id="createBtn">Crea stanza</button>
+        <button id="joinBtn">Entra nella stanza</button>
+
+        <h3>Stanze disponibili:</h3>
+        <ul id="roomList"></ul>
+
+        <p id="messages"></p>
+    </div>
+
+    <!-- SCHERMATA STANZA -->
+    <div id="roomScreen" style="display:none">
+        <h2>Stanza: <span id="currentRoomName"></span></h2>
+        <p id="roomStatus"></p>
+        <button id="readyBtn">Ready</button>
+        <button id="leaveRoomBtn">Lascia stanza</button>
+        <p id="roomMessages"></p>
+    </div>
+
+    <!-- SCHERMATA PIAZZAMENTO NAVI -->
+    <div id="placementScreen" style="display:none">
+        <h2>Piazza le tue navi</h2>
+        <p id="placementStatus"></p>
+        <!-- griglia e UI piazzamento da fare -->
+        <button id="confirmPlacementBtn">Conferma piazzamento</button>
+    </div>
+
+    <!-- SCHERMATA PARTITA -->
+    <div id="gameScreen" style="display:none">
+        <h2>Partita in corso</h2>
+        <p id="gameStatus"></p>
+        <p id="currentTurn"></p>
+        <button id="rollDiceBtn">Tira i dadi</button>
+        <p id="diceResult"></p>
+        <button id="leaveGameBtn">Abbandona partita</button>
+    </div>
+
+    <!-- socket.io client — preso dal server Node -->
+    <!-- <script src="http://localhost:3000/socket.io/socket.io.js"></script> -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        // Prendiamo il token JWT salvato al login
+        const token = localStorage.getItem('token');
+        const user  = JSON.parse(localStorage.getItem('user'));
+
+        // Se non loggato, rimanda al login
+        if (!token || !user) {
+            window.location.href = 'login.html';
+        }
+
+        // Connessione al server Node con il token JWT
+        const socket = io('http://localhost:3000', {
+            auth: { token }
+        });
+
+        // --------------------------------
+        // CONNESSIONE
+        // --------------------------------
+        socket.on('connect', () => {
+            document.getElementById('status').innerText =
+                'Connesso come: ' + user.userName;
+            console.log('Connesso al server Node');
+        });
+
+        socket.on('connect_error', (err) => {
+            document.getElementById('status').innerText =
+                'Errore connessione: ' + err.message;
+            console.error('Errore connessione:', err.message);
+        });
+
+        socket.on('userAlreadyConnected', () => {
+            alert('Sei già connesso da un\'altra scheda!');
+            window.location.href = 'home.html';
+        });
+
+        // --------------------------------
+        // LOBBY
+        // --------------------------------
+        document.getElementById('createBtn').onclick = () => {
+            const roomId   = document.getElementById('roomIdInput').value.trim();
+            const validId  = /^[a-zA-Z0-9_\-]+$/.test(roomId);
+            if (roomId && validId) socket.emit('createRoom', roomId);
+            else document.getElementById('messages').innerText = '❌ Nome stanza non valido.';
+        };
+
+        document.getElementById('joinBtn').onclick = () => {
+            const roomId  = document.getElementById('roomIdInput').value.trim();
+            const validId = /^[a-zA-Z0-9_\-]+$/.test(roomId);
+            if (roomId && validId) socket.emit('joinRoom', roomId);
+            else document.getElementById('messages').innerText = '❌ Nome stanza non valido.';
+        };
+
+        socket.on('roomList', (rooms) => {
+            const list = document.getElementById('roomList');
+            list.innerHTML = '';
+            rooms.forEach(r => {
+                const li  = document.createElement('li');
+                const btn = document.createElement('button');
+                btn.textContent = `${r.name} (${r.size}/2)`;
+                btn.onclick = () => socket.emit('joinRoom', r.name);
+                li.appendChild(btn);
+                list.appendChild(li);
+            });
+        });
+
+        socket.on('roomError', (msg) => {
+            document.getElementById('messages').innerText = '❌ ' + msg;
+        });
+
+        // --------------------------------
+        // STANZA
+        // --------------------------------
+        socket.on('roomCreated', (roomId) => {
+            document.getElementById('currentRoomName').innerText = roomId;
+            document.getElementById('roomMessages').innerText = 'Hai creato la stanza.';
+            showScreen('roomScreen');
+        });
+
+        socket.on('roomJoined', (roomId) => {
+            document.getElementById('currentRoomName').innerText = roomId;
+            document.getElementById('roomMessages').innerText = 'Sei entrato nella stanza.';
+            showScreen('roomScreen');
+        });
+
+        socket.on('roomUpdate', (data) => {
+            document.getElementById('roomStatus').innerText =
+                `Giocatori: ${data.players.join(' vs ')} | Pronti: ${data.nReady}/2`;
+        });
+
+        socket.on('roomLeft', () => {
+            showScreen('lobbyScreen');
+        });
+
+        let isReady = false;
+        document.getElementById('readyBtn').onclick = () => {
+            isReady = !isReady;
+            document.getElementById('readyBtn').innerText = isReady ? 'Not Ready' : 'Ready';
+            socket.emit(isReady ? 'playerReady' : 'playerNotReady');
+        };
+
+        document.getElementById('leaveRoomBtn').onclick = () => {
+            isReady = false;
+            document.getElementById('readyBtn').innerText = 'Ready';
+            socket.emit('leaveRoom');
+        };
+
+        // --------------------------------
+        // PIAZZAMENTO NAVI
+        // --------------------------------
+        socket.on('startPlacement', (data) => {
+            document.getElementById('placementStatus').innerText = data.message;
+            showScreen('placementScreen');
+            // TODO: griglia di piazzamento
+        });
+
+        // Placeholder — per ora mandiamo navi fisse per testare
+        document.getElementById('confirmPlacementBtn').onclick = () => {
+            const testShips = {
+                scout1:      { cells: [[0,0],[0,1]],               hp: 2 },
+                scout2:      { cells: [[2,0],[2,1]],               hp: 2 },
+                scout3:      { cells: [[4,0],[4,1]],               hp: 2 },
+                scout4:      { cells: [[6,0],[6,1]],               hp: 2 },
+                submarine1:  { cells: [[0,3],[0,4],[0,5]],         hp: 3 },
+                submarine2:  { cells: [[2,3],[2,4],[2,5]],         hp: 3 },
+                battleship1: { cells: [[0,6],[0,7],[0,8],[0,9]],   hp: 4 },
+                battleship2: { cells: [[2,6],[2,7],[2,8],[2,9]],   hp: 4 },
+                titan:       { cells: [[0,10],[0,11],[0,12],[0,13],[0,14]], hp: 5 }
+            };
+            socket.emit('placeShips', testShips);
+        };
+
+        socket.on('shipsPlaced', () => {
+            document.getElementById('placementStatus').innerText =
+                'Navi piazzate! Aspetta l\'avversario...';
+            document.getElementById('confirmPlacementBtn').disabled = true;
+        });
+
+        // --------------------------------
+        // PARTITA
+        // --------------------------------
+        socket.on('gameStart', (data) => {
+            showScreen('gameScreen');
+            document.getElementById('gameStatus').innerText = data.message;
+            updateTurn(data.currentTurn, data.currentTurnName);
+        });
+
+        socket.on('diceResult', (data) => {
+            document.getElementById('diceResult').innerText =
+                `🎲 ${data.dice[0]} + ${data.dice[1]} = ${data.sum} → ${data.action}`;
+        });
+
+        document.getElementById('rollDiceBtn').onclick = () => {
+            socket.emit('rollDice');
+        };
+
+        document.getElementById('leaveGameBtn').onclick = () => {
+            socket.emit('leaveGame');
+        };
+
+        socket.on('gameOver', (data) => {
+            document.getElementById('gameStatus').innerText =
+                data.winner === user.userId ? '🎉 Hai vinto!' : '💀 Hai perso!';
+        });
+
+        socket.on('opponentDisconnected', (data) => {
+            document.getElementById('gameStatus').innerText = data.message;
+        });
+
+        // --------------------------------
+        // UTILITY
+        // --------------------------------
+        function showScreen(screenId) {
+            ['lobbyScreen', 'roomScreen', 'placementScreen', 'gameScreen']
+                .forEach(id => {
+                    document.getElementById(id).style.display =
+                        id === screenId ? 'block' : 'none';
+                });
+        }
+
+        function updateTurn(currentTurnId, currentTurnName) {
+            const isMyTurn = currentTurnId === user.userId;
+            document.getElementById('currentTurn').innerText =
+                isMyTurn ? '⚔️ È il tuo turno!' : `⏳ Turno di ${currentTurnName}`;
+            document.getElementById('rollDiceBtn').disabled = !isMyTurn;
+        }
+    </script>
+</body>
+</html>

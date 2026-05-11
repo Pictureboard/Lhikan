@@ -61,6 +61,13 @@ try {
         'exp'      => time() + (60 * 60 * 24) // scade dopo 24 ore
     ];
 
+    //TEMP DEBUG LOG
+    // Subito dopo aver preso l'utente dal DB
+    error_log('Codice nel DB: ' . $user['twoFactorCode']);
+    error_log('Codice inserito: ' . $code);
+    error_log('Scadenza: ' . $user['twoFactorExpire']);
+    error_log('Ora attuale: ' . date('Y-m-d H:i:s'));
+
     $token = JWT::encode($payload, JWT_SECRET, 'HS256');
 
     http_response_code(200);
