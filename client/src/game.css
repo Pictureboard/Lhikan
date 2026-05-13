@@ -1,0 +1,263 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: monospace;
+    background: #1a1a2e;
+    color: #eee;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+}
+
+h1, h2, h3 {
+    margin-bottom: 8px;
+}
+
+/* --------------------------------
+   SCHERMATE
+-------------------------------- */
+.screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+.screen.active {
+    display: flex;
+}
+
+/* --------------------------------
+   LOBBY
+-------------------------------- */
+#lobbyScreen input {
+    padding: 6px 10px;
+    margin: 4px;
+    border-radius: 4px;
+    border: none;
+    background: #2a2a4a;
+    color: #eee;
+}
+
+#roomList {
+    list-style: none;
+    margin-top: 10px;
+}
+
+#roomList li {
+    margin: 4px 0;
+}
+
+/* --------------------------------
+   BOTTONI
+-------------------------------- */
+button {
+    padding: 8px 16px;
+    margin: 4px;
+    border: none;
+    border-radius: 6px;
+    background: #4a90d9;
+    color: white;
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 14px;
+}
+
+button:hover {
+    background: #357abd;
+}
+
+button:disabled {
+    background: #444;
+    cursor: not-allowed;
+}
+
+/* --------------------------------
+   MESSAGGI
+-------------------------------- */
+.message {
+    margin: 6px 0;
+    font-size: 14px;
+    color: #aaa;
+}
+
+.message.error {
+    color: #e74c3c;
+}
+
+.message.success {
+    color: #2ecc71;
+}
+
+/* --------------------------------
+   PIAZZAMENTO NAVI
+-------------------------------- */
+#placementScreen {
+    width: 100%;
+}
+
+#shipList {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 10px 0;
+}
+
+.ship-to-place {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: grab;
+    padding: 6px;
+    border: 1px solid #444;
+    border-radius: 6px;
+    background: #2a2a4a;
+    user-select: none;
+}
+
+.ship-to-place:active {
+    cursor: grabbing;
+}
+
+.ship-to-place.placed {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.ship-preview {
+    display: flex;
+    gap: 2px;
+}
+
+/* Nave selezionata nella lista */
+.ship-to-place.selected {
+    border-color: #4a90d9;
+    background: #1a3a5a;
+    box-shadow: 0 0 8px #4a90d9;
+}
+
+/* Preview valida sulla griglia */
+.cell.preview-valid {
+    background: #2ecc7166;
+}
+
+/* Preview non valida sulla griglia */
+.cell.preview-invalid {
+    background: #e74c3c66;
+}
+
+/* --------------------------------
+   GRIGLIA
+-------------------------------- */
+.grid-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.grid-label {
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 4px;
+}
+
+.grid {
+    display: grid;
+    gap: 2px;
+    padding: 4px;
+    background: #0a0a1e;
+    border-radius: 6px;
+    border: 1px solid #333;
+}
+
+/* Griglia grande (attiva) */
+.grid-wrapper.large .grid {
+    grid-template-columns: repeat(20, 32px);
+    grid-template-rows:    repeat(10, 32px);
+}
+
+/* Griglia piccola (passiva) */
+.grid-wrapper.small .grid {
+    grid-template-columns: repeat(20, 16px);
+    grid-template-rows:    repeat(10, 16px);
+}
+
+/* Griglia piazzamento (sempre grande) */
+#placementGrid .grid {
+    grid-template-columns: repeat(20, 32px);
+    grid-template-rows:    repeat(10, 32px);
+}
+
+.cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    background: #16213e;
+    border: 1px solid #1a2a4a;
+    font-size: 18px;
+    cursor: default;
+    transition: background 0.1s;
+}
+
+/* Celle griglia piccola — emoji più piccole */
+.grid-wrapper.small .cell {
+    font-size: 10px;
+}
+
+/* Hover sulla griglia nemica durante il proprio turno */
+.grid-wrapper.large.enemy .cell:hover {
+    background: #2a3a5a;
+    cursor: crosshair;
+}
+
+/* Celle highlight durante drag */
+.cell.drag-over {
+    background: #2ecc71aa;
+}
+
+.cell.drag-invalid {
+    background: #e74c3caa;
+}
+
+/* --------------------------------
+   ZONA PARTITA
+-------------------------------- */
+#gameScreen {
+    width: 100%;
+}
+
+#gameBoards {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+}
+
+#gameInfo {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+#diceArea {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 8px 0;
+}
+
+#diceDisplay {
+    font-size: 32px;
+    margin: 6px 0;
+}
