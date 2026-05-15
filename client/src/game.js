@@ -105,6 +105,24 @@ function buildGrid(gridEl, rows, cols, clickHandler, hoverHandler) {
             gridEl.appendChild(cell);
         }
     }
+
+    cell.addEventListener('mouseenter', () => {
+        const shipData = placedShips[Object.keys(placedShips)
+            .find(id => placedShips[id].cells
+            .some(([r, c]) => r === row && c === col))];
+        if (shipData) {
+            shipData.cells.forEach(([r, c]) => {
+                const c2 = getCell(document.getElementById('myGrid'), r, c);
+                if (c2) c2.classList.add('ship-hover');
+            });
+        }
+    });
+    
+    cell.addEventListener('mouseleave', () => {
+        document.getElementById('myGrid')
+            .querySelectorAll('.ship-hover')
+            .forEach(c => c.classList.remove('ship-hover'));
+    });
 }
 
 // ================================

@@ -4,6 +4,8 @@ const http    = require('http');
 const { Server } = require('socket.io');
 const { verifyToken } = require('./auth');
 
+const { handleAttack, handleAbility, handleMove } = require('./gameLogic');
+
 const PORT = process.env.PORT || 3000;
 
 const httpServer = http.createServer();
@@ -278,37 +280,31 @@ io.on('connection', (socket) => {
             socket.emit('roomError', 'Non sei in nessuna stanza.');
             return;
         }
-
+    
         const [roomId, room] = existing;
-
+    
+        // Validazioni
         if (room.state !== 'playing') {
             socket.emit('roomError', 'La partita non è in corso.');
             return;
         }
-
         if (room.currentTurn !== userId) {
             socket.emit('roomError', 'Non è il tuo turno.');
             return;
         }
-
         if (room.diceRolled) {
             socket.emit('roomError', 'Hai già tirato i dadi questo turno.');
             return;
         }
-
-        // Tiriamo i dadi
+    
         const die1 = Math.floor(Math.random() * 6) + 1;
         const die2 = Math.floor(Math.random() * 6) + 1;
         const sum  = die1 + die2;
-
-        room.dice      = [die1, die2];
-        room.diceRolled = true;
-
-        // Determiniamo l'azione in base al risultato
+    
+        room.dice = [die1, die2];
+    
         let action;
-
         if (die1 === die2) {
-            // Doppio — abilità speciale
             switch (die1) {
                 case 6: action = 'MIRV';   break;
                 case 5: action = 'RADAR';  break;
@@ -318,28 +314,80 @@ io.on('connection', (socket) => {
                 case 1: action = 'SHIELD'; break;
             }
         } else if (sum > 10) {
-            action = 'HYDROGEN_BOMB'; // area 3x3
+            action = 'HYDROGEN_BOMB';
         } else if (sum > 8) {
-            action = 'NUKE';          // area 2x2
+            action = 'NUKE';
         } else if (sum > 6) {
-            action = 'TRIPLE_SHOT';   // 3 celle singole
+            action = 'TRIPLE_SHOT';
         } else if (sum > 4) {
-            action = 'DOUBLE_SHOT';   // 2 celle singole
+            action = 'DOUBLE_SHOT';
         } else {
-            action = 'SINGLE_SHOT';   // 1 cella singola
+            action = 'SINGLE_SHOT';
         }
-
+    
+        // Salviamo tutto sul server
         room.currentAction = action;
-
+        room.diceRolled    = true;
+    
+        switch (action) {
+            case 'SINGLE_SHOT':   room.attacksLeft = 1; break;
+            case 'DOUBLE_SHOT':   room.attacksLeft = 2; break;
+            case 'TRIPLE_SHOT':   room.attacksLeft = 3; break;
+            case 'NUKE':          room.attacksLeft = 1; break;
+            case 'HYDROGEN_BOMB': room.attacksLeft = 1; break;
+            case 'MIRV':          room.attacksLeft = 3; break;
+            case 'RADAR':         room.attacksLeft = 1; break;
+            case 'SHIELD':        room.attacksLeft = 1; break;
+            case 'MOVE':          room.attacksLeft = 0; break;
+        }
+    
         console.log(`🎲 ${userName} ha tirato ${die1}+${die2}=${sum} → ${action}`);
-
-        // Comunichiamo il risultato a entrambi i giocatori
+    
         io.to(roomId).emit('diceResult', {
             player: userId,
             dice:   [die1, die2],
             sum,
             action
         });
+    });
+
+    // --------------------------------
+    // ATTACCO
+    // --------------------------------
+    socket.on('attack', (data) => {
+        const existing = findRoomByUser(userId);
+        if (!existing) {
+            socket.emit('roomError', 'Non sei in nessuna stanza.');
+            return;
+        }
+        const [roomId, room] = existing;
+        handleAttack(io, socket, room, roomId, userId, data);
+    });
+
+    // --------------------------------
+    // ABILITÀ SPECIALI (RADAR, SHIELD, MIRV)
+    // --------------------------------
+    socket.on('useAbility', (data) => {
+        const existing = findRoomByUser(userId);
+        if (!existing) {
+            socket.emit('roomError', 'Non sei in nessuna stanza.');
+            return;
+        }
+        const [roomId, room] = existing;
+        handleAbility(io, socket, room, roomId, userId, data);
+    });
+
+    // --------------------------------
+    // MOVE
+    // --------------------------------
+    socket.on('moveShip', (data) => {
+        const existing = findRoomByUser(userId);
+        if (!existing) {
+            socket.emit('roomError', 'Non sei in nessuna stanza.');
+            return;
+        }
+        const [roomId, room] = existing;
+        handleMove(io, socket, room, roomId, userId, data);
     });
 
     // --------------------------------
@@ -471,19 +519,24 @@ io.on('connection', (socket) => {
     function startGame(roomId) {
         const room = roomsData[roomId];
         if (!room) return;
-
-        room.state      = 'playing';
-        room.diceRolled = false;
-
-        // Scegliamo chi inizia a caso
+    
+        room.state         = 'playing';
+        room.currentAction = null;
+        room.attacksLeft   = 0;
+        room.diceRolled    = false;
+        // Tiene traccia delle celle già colpite per ogni giocatore
+        // { userId: Set di stringhe "row-col" }
+        room.hitCells      = {};
+        room.players.forEach(p => room.hitCells[p] = new Set());
+    
         const startingPlayer = room.players[Math.floor(Math.random() * 2)];
         room.currentTurn = startingPlayer;
-
+    
         console.log(`🎮 Partita iniziata nella stanza ${roomId}, inizia ${room.playersData[startingPlayer].userName}`);
-
+    
         io.to(roomId).emit('gameStart', {
-            message:        'La partita è iniziata!',
-            currentTurn:    startingPlayer,
+            message:         'La partita è iniziata!',
+            currentTurn:     startingPlayer,
             currentTurnName: room.playersData[startingPlayer].userName
         });
     }

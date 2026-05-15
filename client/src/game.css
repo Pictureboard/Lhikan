@@ -152,6 +152,12 @@ button:disabled {
     background: #e74c3c66;
 }
 
+/* Highlight nave al hover durante la partita */
+.cell.ship-hover {
+    background: #4a90d966;
+    cursor: pointer;
+}
+
 /* --------------------------------
    GRIGLIA
 -------------------------------- */
