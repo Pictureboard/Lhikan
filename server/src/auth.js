@@ -14,7 +14,7 @@ function verifyToken(token) {
             email:    decoded.email
         };
     } catch (err) {
-        console.log('Errore verifica:', err.message);
+        console.log('Tung tung tung sahur god says:', err.message);
         return null;
     }
 }
